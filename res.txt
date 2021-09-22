@@ -1,0 +1,112 @@
+const http = require('http');
+const express = require('express');
+const {json, urlencoded, response} = require('express');
+const app = express();
+const mysql = require('mysql');
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+})
+
+app.use(urlencoded({limit: '50mb', extended: true}))
+app.use(json({limit: '50mb'}));
+
+app.use('/assets', express.static(__dirname + '/assets/photos'))
+
+const conn = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: '',
+  database: 'db_warungkopi'
+})
+
+// LOGIN
+app.get('/statuslogin', (req, res) => {
+  conn.query("SELECT * FROM `tbl_status_login` ORDER BY `isLoggedIn` ASC", (err, rows) => {
+    res.json(rows)
+  })
+})
+
+app.post('/login', (req, res) => {
+  conn.query("UPDATE `tbl_status_login` as TblStatus SET TblStatus.isLoggedIn = 'true' WHERE TblStatus.statuslogin_id = 1", (err, rows) => {
+    res.json(rows)
+  })
+})
+
+app.post('/loginAuth', (req, res) => {
+  var username = req.body.username;
+  var password = req.body.password;
+  var wewenang = req.body.wewenang;
+  if (username && password && wewenang) {
+    conn.query('SELECT * FROM `tbl_user` WHERE username = ? AND password = ? AND wewenang = ?', [username, password, wewenang], function (error, results, fields) {
+      if (results.length > 0) {
+        res.send('Ada');
+      } else {
+        res.send('Tidak ada');
+      }
+      res.end();
+    }) 
+  }
+})
+
+app.post('/logout', (req, res) => {
+  conn.query("UPDATE `tbl_user` as TblUser, `tbl_status_login` as TblStatus SET TblUser.lastLoggedIn = 'false', TblStatus.isLoggedIn = 'false' WHERE TblUser.id_user = 1 AND TblStatus.statuslogin_id = 1", (err, rows) => {
+    res.json(rows)
+  })
+})
+
+// MENU PESANAN
+app.get('/daftarmenu', (req, res) => {
+  conn.query("SELECT * FROM `tbl_menu_pesanan` INNER JOIN `tbl_kategori_menu` ON `tbl_menu_pesanan`.`id_kategori` = `tbl_kategori_menu`.`id_kategori`", (err, rows) => {
+    res.json(rows)
+  })
+})
+
+// Kategori
+app.get('/kategori', (req, res) => {
+  conn.query("SELECT * FROM `tbl_kategori_menu`", (err, rows) => {
+    res.json(rows)
+  })
+})
+
+// NOMOR MEJA
+app.get('/nomormeja', (req, res) => {
+  conn.query("SELECT * FROM `tbl_nomor_meja`", (err, rows) => {
+    res.json(rows)
+  })
+})
+
+app.post('/getEditMeja', (req, res) => {
+  var nomormeja_edit = req.body.nomormeja_edit;
+  conn.query('SELECT * FROM `tbl_nomor_meja` WHERE `nomor_meja` = ?', [nomormeja_edit], (err, rows) => {
+    res.json(rows)
+  })
+})
+
+app.post('/addTable', (req, res) => {
+  var nomortable = req.body.nomortable;
+  var jumlahpel = req.body.jumlahpel;
+  var ketersediaan = req.body.ketersediaan;
+  conn.query('INSERT INTO `tbl_nomor_meja` (`id_nomor_meja`, `nomor_meja`, `maksimal_pelanggan`, `ketersediaan_meja`) VALUES (NULL, ?, ?, ?);', [nomortable, jumlahpel, ketersediaan], (err, rows, result) => {
+    if (err)
+      return res.json(err)
+    else
+      return res.json(result)
+  })
+})
+
+app.post('/deleteTable', (req, res) => {
+  var nomortable = req.body.nomortable;
+  conn.query('DELETE FROM tbl_nomor_meja WHERE nomor_meja = ?', [nomortable], (err, rows, result) => {
+    if (err)
+      return res.json(err)
+    else
+      return res.json(result)
+  })
+})
+
+const server = http.createServer(app);
+server.listen(8000, () => {
+  console.log('Sistem Informasi Pengelolaan Warung Kopi')
+})
